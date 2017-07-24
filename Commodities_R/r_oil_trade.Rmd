@@ -1,0 +1,241 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(binhf)
+library(Quandl)
+library(reshape2)
+library(stats)
+Quandl.api_key(api_key = "8u9meDr5sQxGim8ATVt6")
+```
+
+################## US Oil Imports ############
+
+```{r}
+symbols = list('EIA/STEO_CONIPUS_M', 'EIA/PET_MCRIMUS2_M', 'EIA/PET_MTTIMUS2_M')
+imports_title = list('Date', 'Net_Imports', 'Total_Crude_Oil', 'Oil_Petroleum_Products')
+
+```
+
+
+```{r}
+get_imports = function(code, start, end, periodicity){
+  imports = Quandl(code = symbols, start_date=start, end_date=end, collapse=periodicity)
+  colnames(imports) = imports_title
+  imports[,3:4] = imports[,3:4] / 1000
+  imports[,2:4] = round(imports[,2:4], digits = 1)
+  return(imports)
+}
+
+imports = get_imports(code = symbols, 
+  start = '01-01-2000',
+  end = '01-01-2017', 
+  periodicity = 'annual')
+
+imports
+```
+
+
+```{r}
+#Graph 1 is ok
+ggplot(data = imports, aes(x = Date)) +
+  geom_line(aes(y=Net_Imports, colour='Net_Imports')) + 
+  geom_line(aes(y=Total_Crude_Oil, colour='Total_Crude_Oil')) + 
+  geom_line(aes(y=Oil_Petroleum_Products, colour='Oil_Petroleum_Products')) + 
+  scale_color_manual("", 
+    values = c("Net_Imports"='green', 
+      "Total_Crude_Oil"='blue', 
+      "Oil_Petroleum_Products"='red')) +
+  xlab("Date") + 
+  scale_y_continuous(name = "Millions of Barrels per Day", limits = c(0,20)) + 
+  labs(title='US Crude Oil Imports')
+
+#Graph 2 is much better
+melt_df = melt(imports, id='Date')
+ggplot(data = melt_df, aes(x = Date, y=value, colour=variable)) + 
+  geom_line() + 
+  ggtitle(label='U.S Crude Oil Imports') +
+  labs(x='Date', y='Million barrels/day' )
+```
+
+###### US Oil Exports ###### 
+
+```{r}
+symbols2 = list('EIA/PET_MCREXUS2_M',
+  'EIA/PET_MTTEXUS2_M', 
+  'EIA/PET_MDIEXUS2_M',
+  'EIA/PET_MKJEXUS2_M')
+
+exports_title = list('Date', 
+                  'Total_Crude_Exports',
+                 'Oil_Petroleum_Products',
+                 'Distillate_Fuel',
+                 'Jet_Fuel')
+
+```
+
+```{r}
+get_exports = function(code, start, end, periodicity){
+  exports = Quandl(code = symbols2, start_date=start, end_date=end, collapse=periodicity)
+  colnames(exports) = exports_title
+  exports[,-1] = round(exports[,-1]/1000, digits = 2)
+  return(exports)
+}
+
+exports = get_exports(code = symbols, 
+  start = '01-01-2000',
+  end = '01-01-2017', 
+  periodicity = 'monthly')
+
+exports
+```
+
+
+```{r}
+#Graph 1 
+ggplot(data = exports, aes(x = Date)) +
+  geom_line(aes(y=Total_Crude_Exports, colour='Crude Exports')) + 
+  geom_line(aes(y=Oil_Petroleum_Products, colour='Oil & Petroleum Products')) + 
+  geom_line(aes(y=Distillate_Fuel, colour='Distillate Fuel')) + 
+  geom_line(aes(y=Jet_Fuel, colour='Jet Fuel')) + 
+  scale_color_manual("", 
+    values = c("Crude Exports"='green', 
+      "Oil & Petroleum Products"='blue', 
+      "Distillate Fuel"='red', 
+      'Jet Fuel'= 'black')) +
+  xlab("Date") + 
+  scale_y_continuous(name = "Millions of Barrels per Day", limits = c(0,8)) + 
+  labs(title='US Crude Oil Exports')
+
+#Graph 2 
+melt_df = melt(exports, id='Date')
+ggplot(data = melt_df, aes(x = Date, y=value, colour=variable)) + 
+  geom_line() + 
+  ggtitle(label='US Oil Exports') +
+  labs(x='Date', y='Million barrels/day')
+
+```
+
+
+####### US Production ####### 
+```{r}
+oil_prod = Quandl('EIA/STEO_COPRPUS_M')
+colnames(oil_prod) = c('Date', 'Oil_Production')
+plot(x=oil_prod$Date, 
+  y=oil_prod$Oil_Production, 
+  type = 'line', 
+  xlab = 'Date', 
+  ylab = 'Million Barrels/Day', 
+  main = 'US Oil Exports',
+  col = 'red'
+  )
+
+```
+
+####### US Oil Inventory ###### 
+
+```{r}
+ex_spr = Quandl('EIA/STEO_COSXPUS_M')
+colnames(ex_spr) = c('Date', 'Stockpiles')
+
+plot(x=ex_spr$Date, 
+  y=ex_spr$Stockpiles, 
+  type = 'line', 
+  xlab = 'Date', 
+  ylab = 'Million Barrels', 
+  main = 'US Crude Oil Stockpiles (exlcuding SPR)',
+  col = 'red'
+  )
+```
+
+```{r}
+spr_stockpiles = function(start, end, periodicity) {
+  spr_titles = list('EIA/STEO_COSQPUS_M', 'EIA/PET_M_EPC0_VSI_NUS_DAYS_M')
+  spr = Quandl(spr_titles, start_date=start, end_date=end, collapse=periodicity)
+  colnames(spr) = c('Date', 'US_Oil_Stockpiles', 'Days_of_Supply_as_Net_Imports')
+  return(spr)
+}
+
+spr = tbl_df(spr_stockpiles(start = '01-01-2000',
+  end = '01-01-2017', 
+  periodicity = 'monthly'))
+spr
+```
+
+```{r}
+#Method 1 - Transforming the seconday axes through a transformation formula (inefficient)
+ggplot(data=spr, aes(x=Date)) + 
+  geom_line(aes(y=US_Oil_Stockpiles, colour='U.S. Oil Stockpiles')) + 
+  geom_col(aes(y=Days_of_Supply_as_Net_Imports, colour='Days of Supply as Net Imports')) + 
+  scale_y_continuous(sec.axis = sec_axis(~.*.5, name='Days of Supply as Net Imports')) + 
+  xlab(label = 'Date') + 
+  labs(title='Strategic Petroleum Reserves') + 
+  scale_colour_manual("", 
+    values = c('U.S. Oil Stockpiles'='blue', 'Days of Supply as Net Imports'='red'))
+```
+
+```{r}
+dualplot::dualplot(x1 = spr$Date,
+  y1=spr$US_Oil_Stockpiles, 
+  y2=spr$Days_of_Supply_as_Net_Imports,
+  ylim1 = c(400,800),
+  ylim2 = c(0,200),
+  ylab1 = 'Millions of Barrels',
+  ylab2 = 'Days of Supply as Net Imports',
+  yleg1 = 'SPR', 
+  yleg2 = 'Inventory',
+  mar = c(3,5,1,6))
+
+```
+
+
+#### International Oil Reserves #### 
+
+```{r}
+
+intl_reserves = intl_reserves = list('EIA/INTL_57_6_CHN_BB_A', 'EIA/INTL_57_6_GBR_BB_A', 'EIA/INTL_57_6_ARE_BB_A', 'EIA/INTL_57_6_SAU_BB_A', 'EIA/INTL_57_6_QAT_BB_A', 'EIA/INTL_57_6_VEN_BB_A', 'EIA/INTL_57_6_BRA_BB_A', 'EIA/INTL_57_6_RUS_BB_A', 'EIA/INTL_57_6_COL_BB_A', 'EIA/INTL_57_6_IRQ_BB_A', 'EIA/INTL_57_6_IRN_BB_A', 'EIA/INTL_57_6_NOR_BB_A', 'EIA/INTL_57_6_CAN_BB_A', 'EIA/INTL_57_6_NGA_BB_A')
+
+intl_titles = list('Date', 'China', 'UK', 'UAE', 'Saudi Arabia', 'Qatar', 'Venezuela', 'Brazil', 'Russia', 'Colombia', 'Iraq', 'Iran', 'Norway', 'Canada', 'Nigeria')
+
+```
+
+```{r}
+#Create DF from Quandl API
+oil_reserves = Quandl(intl_reserves, 
+  start_date='01-01-1990', 
+  end_date='01-01-2018', 
+  collapse='annual')
+
+#Change Column Names
+colnames(oil_reserves) = intl_titles
+
+#DF
+rownames(oil_reserves) = oil_reserves$Date
+oil_reserves$Date = NULL
+oil_reserves
+```
+
+```{r}
+a = sort(as.vector(oil_reserves[nrow(oil_reserves),]), decreasing = T)
+barplot(as.numeric(a[,1:5]), 
+  names.arg = colnames(a[1:5]), 
+  main = 'International Oil Reserves',
+  ylab = 'Billions of Barrels',
+  xlim = c(0,6),
+  width = 1, 
+  col = c('green', 'blue', 'black', 'red', 'yellow'))
+
+```
+
+
+
+
+
+
